@@ -172,8 +172,8 @@ double N3(double x, double y, const Vector2d &v1, const Vector2d &v2,
 }
 
 Matrix3d compute_stiffness(const Vector2d &v1, const Vector2d &v2,
-                           const Vector2d &v3, const Vector3d &Ue,
-                           FunctionParser &source_deriv_func) {
+                          const Vector2d &v3, const Vector3d &Ue,
+                          FunctionParser &source_deriv_func) {
   Matrix3d K = Matrix3d::Zero();
   double area =
       ((v2[0] - v1[0]) * (v3[1] - v1[1]) - (v3[0] - v1[0]) * (v2[1] - v1[1])) /
@@ -197,8 +197,13 @@ Matrix3d compute_stiffness(const Vector2d &v1, const Vector2d &v2,
     }
   }
 
-  // 添加非线性项
-  double u_center = (Ue[0] + Ue[1] + Ue[2]) / 3.0; // 单元中心点的值
+  // 计算单元中心点的值，使用形状函数
+  double xc = (v1[0] + v2[0] + v3[0]) / 3.0;
+  double yc = (v1[1] + v2[1] + v3[1]) / 3.0;
+  double u_center = N1(xc, yc, v1, v2, v3) * Ue[0] +
+                   N2(xc, yc, v1, v2, v3) * Ue[1] +
+                   N3(xc, yc, v1, v2, v3) * Ue[2];
+  
   double source_deriv = source_deriv_func.evaluate({u_center});
 
   Matrix3d M;
@@ -212,15 +217,20 @@ Matrix3d compute_stiffness(const Vector2d &v1, const Vector2d &v2,
 
 // 三角形单元荷载向量计算
 Vector3d compute_force(const Vector2d &v1, const Vector2d &v2,
-                       const Vector2d &v3, const Vector3d &Ue,
-                       FunctionParser &source_func) {
+                        const Vector2d &v3, const Vector3d &Ue,
+                        FunctionParser &source_func) {
   Vector3d F = Vector3d::Zero();
   double area =
       ((v2[0] - v1[0]) * (v3[1] - v1[1]) - (v3[0] - v1[0]) * (v2[1] - v1[1])) /
       2.0;
 
-  // 使用重心点求积
-  double u_center = (Ue[0] + Ue[1] + Ue[2]) / 3.0;
+  // 使用形状函数计算单元中心点的值
+  double xc = (v1[0] + v2[0] + v3[0]) / 3.0;
+  double yc = (v1[1] + v2[1] + v3[1]) / 3.0;
+  double u_center = N1(xc, yc, v1, v2, v3) * Ue[0] +
+                   N2(xc, yc, v1, v2, v3) * Ue[1] +
+                   N3(xc, yc, v1, v2, v3) * Ue[2];
+
   double source_value = source_func.evaluate({u_center});
 
   F << 1, 1, 1;
@@ -321,6 +331,9 @@ void save_to_vtk(const std::string &filename, const MatrixXd &data,
     return;
   }
 
+  // 设置输出精度
+  file << std::scientific << std::setprecision(10);
+
   // Write VTK header
   file << "# vtk DataFile Version 3.0\n";
   file << "Poisson equation solution\n";
@@ -330,18 +343,17 @@ void save_to_vtk(const std::string &filename, const MatrixXd &data,
   int nx = x.size();
   int ny = y.size();
   file << "DIMENSIONS " << nx << " " << ny << " 1\n";
-  file << "POINTS " << (nx * ny) << " float\n";
+  file << "POINTS " << (nx * ny) << " double\n";
 
-  // Write coordinates
   for (int j = 0; j < ny; ++j) {
     for (int i = 0; i < nx; ++i) {
-      file << x[i] << " " << y[j] << " 0\n";
+      file << x[i] << " " << y[j] << " 0.0\n";
     }
   }
 
   // Write data
-  file << "POINT_DATA " << (nx * ny) << "\n";
-  file << "SCALARS solution float 1\n";
+  file << "\nPOINT_DATA " << (nx * ny) << "\n";
+  file << "SCALARS solution double 1\n";
   file << "LOOKUP_TABLE default\n";
 
   for (int j = 0; j < ny; ++j) {
@@ -378,7 +390,6 @@ double FunctionParser::evaluate(const std::vector<double> &values) {
   return parser.Eval();
 }
 
-// 实现 Config 类的静态成员函数
 Config Config::from_json(const std::string &filename) {
   std::ifstream file(filename);
   if (!file.is_open()) {
@@ -581,7 +592,6 @@ void Config::validate() const {
   }
 }
 
-// 检查JSON中的必需字段
 void Config::check_required_fields(const json &j) {
   std::vector<std::string> required_fields = {
       "lx",       "ly",      "Nx",       "Ny",
@@ -621,7 +631,6 @@ void Config::check_required_fields(const json &j) {
   }
 }
 
-// 添加在 gauss_integrate_2d 函数之后
 void apply_boundary_conditions(MatrixXd &K, VectorXd &F, int n_e_x, int n_e_y,
                                double u_left, double u_right, double u_top,
                                double u_bottom) {

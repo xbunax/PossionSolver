@@ -23,6 +23,13 @@ int main(int argc, char *argv[]) {
       std::vector<double> x(x_vec.data(), x_vec.data() + x_vec.size());
       std::vector<double> y(y_vec.data(), y_vec.data() + y_vec.size());
 
+      // 在网格生成后添加这些调试信息
+      std::cout << "Grid information:" << std::endl;
+      std::cout << "x range: [" << x.front() << ", " << x.back() << "]"
+                << std::endl;
+      std::cout << "y range: [" << y.front() << ", " << y.back() << "]"
+                << std::endl;
+
       // 设置初始猜测解
       int n_x = config.Nx + 1;
       int n_y = config.Ny + 1;
@@ -40,18 +47,26 @@ int main(int argc, char *argv[]) {
           config.u_left, config.u_right, config.u_top, config.u_bottom,
           config.rel_tol, config.abs_tol, config.max_iter, config.mesh);
 
+      // 将一维向量U重组为二维矩阵
+      MatrixXd U_matrix(config.Ny + 1, config.Nx + 1);
+      for (int j = 0; j < config.Ny + 1; ++j) {
+        for (int i = 0; i < config.Nx + 1; ++i) {
+          U_matrix(j, i) = U[j * (config.Nx + 1) + i];
+        }
+      }
+
+      // 保存结果到VTK文件
+      save_to_vtk(config.output_path, U_matrix, x, y);
+
+      std::cout << "Solution has been saved to: " << config.output_path
+                << std::endl;
       std::string numerical_vtk = "numerical_solution.vtk";
       std::string analytical_vtk = "analytical_solution.vtk";
       std::string error_vtk = "error.vtk";
 
       // 保存所有结果并计算误差
-      // save_solutions_and_error(numerical_vtk, analytical_vtk, error_vtk, U,
-      // x, y,
-      //                          config.lx, config.ly);
-
-      std::cout << "Solution has been saved to: " << config.output_path
-                << std::endl;
-
+      save_solutions_and_error(numerical_vtk, analytical_vtk, error_vtk, U, x,
+                               y, config.lx, config.ly);
     } catch (const mu::Parser::exception_type &e) {
       std::cerr << "Error in function expression: " << e.GetMsg() << std::endl;
       return 1;
