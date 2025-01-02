@@ -48,84 +48,6 @@ double gauss_integrate_2d(std::function<double(double, double)> f, int n,
   return 0.25 * (xb - xa) * (yb - ya) * integral;
 }
 
-Matrix4d element_stiffness(double x0, double x1, double y0, double y1) {
-  Matrix4d K = Matrix4d::Zero();
-  std::vector<double (*)(double, double)> dN_ds = {dN1_ds, dN2_ds, dN3_ds,
-                                                   dN4_ds};
-  std::vector<double (*)(double, double)> dN_dt = {dN1_dt, dN2_dt, dN3_dt,
-                                                   dN4_dt};
-  for (int i = 0; i < 4; ++i) {
-    for (int j = 0; j < 4; ++j) {
-      auto integrand = [&](double s, double t) {
-        Matrix2d J;
-        J << 0.5 * (x1 - x0), 0, 0, 0.5 * (y1 - y0);
-        double detJ = J.determinant();
-        Matrix2d invJ = J.inverse();
-
-        Vector2d dNi(dN_ds[i](s, t), dN_dt[i](s, t));
-        Vector2d dNj(dN_ds[j](s, t), dN_dt[j](s, t));
-
-        Vector2d gradNi = invJ * dNi;
-        Vector2d gradNj = invJ * dNj;
-
-        return (gradNi.dot(gradNj)) * detJ;
-      };
-      K(i, j) = gauss_integrate_2d(integrand, 3, -1, 1, -1, 1);
-    }
-  }
-  return K;
-}
-
-Vector4d element_force(std::function<double(double, double)> f, double x0,
-                       double x1, double y0, double y1) {
-  Vector4d F = Vector4d::Zero();
-  std::vector<double (*)(double, double)> N = {N1, N2, N3, N4};
-  for (int i = 0; i < 4; ++i) {
-    auto integrand = [&](double s, double t) {
-      Matrix2d J;
-      J << 0.5 * (x1 - x0), 0, 0, 0.5 * (y1 - y0);
-      double detJ = J.determinant();
-
-      double x = 0.5 * (x1 - x0) * s + 0.5 * (x1 + x0);
-      double y = 0.5 * (y1 - y0) * t + 0.5 * (y1 + y0);
-
-      return N[i](s, t) * f(x, y) * detJ;
-    };
-    F(i) = gauss_integrate_2d(integrand, 3, -1, 1, -1, 1);
-  }
-  return F;
-}
-
-void assemble_global_matrices(int n_e_x, int n_e_y,
-                              const std::vector<double> &x,
-                              const std::vector<double> &y,
-                              std::function<double(double, double)> f,
-                              MatrixXd &K, VectorXd &F) {
-  int n_n = (n_e_x + 1) * (n_e_y + 1);
-  K = MatrixXd::Zero(n_n, n_n);
-  F = VectorXd::Zero(n_n);
-
-  for (int i = 0; i < n_e_x; ++i) {
-    for (int j = 0; j < n_e_y; ++j) {
-      double x0 = x[i], x1 = x[i + 1];
-      double y0 = y[j], y1 = y[j + 1];
-      Matrix4d Ke = element_stiffness(x0, x1, y0, y1);
-      Vector4d Fe = element_force(f, x0, x1, y0, y1);
-
-      std::vector<int> nodes = {j * (n_e_x + 1) + i, j * (n_e_x + 1) + i + 1,
-                                (j + 1) * (n_e_x + 1) + i + 1,
-                                (j + 1) * (n_e_x + 1) + i};
-
-      for (int a = 0; a < 4; ++a) {
-        F(nodes[a]) += Fe(a);
-        for (int b = 0; b < 4; ++b) {
-          K(nodes[a], nodes[b]) += Ke(a, b);
-        }
-      }
-    }
-  }
-}
-
 void apply_boundary_conditions(MatrixXd &K, VectorXd &F, int n_e_x, int n_e_y,
                                double u_left, double u_right, double u_top,
                                double u_bottom) {
@@ -276,7 +198,8 @@ Config Config::from_json(const std::string &filename) {
     config.u_bottom = j["u_bottom"];
     config.output_path = j["output_path"];
   } catch (const json::type_error &e) {
-    throw std::runtime_error("Type error in config file: " + std::string(e.what()));
+    throw std::runtime_error("Type error in config file: " +
+                             std::string(e.what()));
   }
 
   // 验证参数值
@@ -508,81 +431,84 @@ void save_solutions_and_error(const std::string &numerical_vtk,
 
 // 实现参数验证函数
 void Config::validate() const {
-    // 检查几何参数
-    if (lx <= 0 || ly <= 0) {
-        throw std::invalid_argument("Domain dimensions (lx, ly) must be positive");
-    }
+  // 检查几何参数
+  if (lx <= 0 || ly <= 0) {
+    throw std::invalid_argument("Domain dimensions (lx, ly) must be positive");
+  }
 
-    // 检查网格参数
-    if (Nx <= 0 || Ny <= 0) {
-        throw std::invalid_argument("Grid divisions (Nx, Ny) must be positive");
-    }
+  // 检查网格参数
+  if (Nx <= 0 || Ny <= 0) {
+    throw std::invalid_argument("Grid divisions (Nx, Ny) must be positive");
+  }
 
-    // 检查网格类型
-    if (mesh != "rectangle") {
-        throw std::invalid_argument("Currently only 'rectangle' mesh type is supported");
-    }
+  // 检查网格类型
+  if (mesh != "rectangle") {
+    throw std::invalid_argument(
+        "Currently only 'rectangle' mesh type is supported");
+  }
 
-    // 检查表达式是否为空
-    if (guess_expr.empty()) {
-        throw std::invalid_argument("Initial guess expression cannot be empty");
-    }
-    if (source_expr.empty()) {
-        throw std::invalid_argument("Source function expression cannot be empty");
-    }
-    if (source_derivatives_expr.empty()) {
-        throw std::invalid_argument("Source derivatives expression cannot be empty");
-    }
+  // 检查表达式是否为空
+  if (guess_expr.empty()) {
+    throw std::invalid_argument("Initial guess expression cannot be empty");
+  }
+  if (source_expr.empty()) {
+    throw std::invalid_argument("Source function expression cannot be empty");
+  }
+  if (source_derivatives_expr.empty()) {
+    throw std::invalid_argument(
+        "Source derivatives expression cannot be empty");
+  }
 
-    // 检查迭代参数
-    if (max_iter <= 0) {
-        throw std::invalid_argument("Maximum iterations must be positive");
-    }
-    if (rel_tol <= 0 || abs_tol <= 0) {
-        throw std::invalid_argument("Tolerance values must be positive");
-    }
+  // 检查迭代参数
+  if (max_iter <= 0) {
+    throw std::invalid_argument("Maximum iterations must be positive");
+  }
+  if (rel_tol <= 0 || abs_tol <= 0) {
+    throw std::invalid_argument("Tolerance values must be positive");
+  }
 
-    // 检查输出路径
-    if (output_path.empty()) {
-        throw std::invalid_argument("Output path cannot be empty");
-    }
+  // 检查输出路径
+  if (output_path.empty()) {
+    throw std::invalid_argument("Output path cannot be empty");
+  }
 }
 
 // 检查JSON中的必需字段
 void Config::check_required_fields(const json &j) {
-    std::vector<std::string> required_fields = {
-        "lx", "ly", "Nx", "Ny", "mesh", "guess", "source",
-        "source_derivatives", "max_iter", "rel_tol", "abs_tol",
-        "u_left", "u_right", "u_top", "u_bottom", "output_path"
-    };
+  std::vector<std::string> required_fields = {
+      "lx",       "ly",      "Nx",       "Ny",
+      "mesh",     "guess",   "source",   "source_derivatives",
+      "max_iter", "rel_tol", "abs_tol",  "u_left",
+      "u_right",  "u_top",   "u_bottom", "output_path"};
 
-    for (const auto &field : required_fields) {
-        if (!j.contains(field)) {
-            throw std::invalid_argument("Missing required field in config file: " + field);
-        }
+  for (const auto &field : required_fields) {
+    if (!j.contains(field)) {
+      throw std::invalid_argument("Missing required field in config file: " +
+                                  field);
     }
+  }
 
-    // 检查字段类型
-    if (!j["lx"].is_number() || !j["ly"].is_number()) {
-        throw std::invalid_argument("Domain dimensions must be numbers");
-    }
-    if (!j["Nx"].is_number_integer() || !j["Ny"].is_number_integer()) {
-        throw std::invalid_argument("Grid divisions must be integers");
-    }
-    if (!j["mesh"].is_string()) {
-        throw std::invalid_argument("Mesh type must be a string");
-    }
-    if (!j["guess"].is_string() || !j["source"].is_string() || 
-        !j["source_derivatives"].is_string()) {
-        throw std::invalid_argument("Expressions must be strings");
-    }
-    if (!j["max_iter"].is_number_integer()) {
-        throw std::invalid_argument("Maximum iterations must be an integer");
-    }
-    if (!j["rel_tol"].is_number() || !j["abs_tol"].is_number()) {
-        throw std::invalid_argument("Tolerance values must be numbers");
-    }
-    if (!j["output_path"].is_string()) {
-        throw std::invalid_argument("Output path must be a string");
-    }
+  // 检查字段类型
+  if (!j["lx"].is_number() || !j["ly"].is_number()) {
+    throw std::invalid_argument("Domain dimensions must be numbers");
+  }
+  if (!j["Nx"].is_number_integer() || !j["Ny"].is_number_integer()) {
+    throw std::invalid_argument("Grid divisions must be integers");
+  }
+  if (!j["mesh"].is_string()) {
+    throw std::invalid_argument("Mesh type must be a string");
+  }
+  if (!j["guess"].is_string() || !j["source"].is_string() ||
+      !j["source_derivatives"].is_string()) {
+    throw std::invalid_argument("Expressions must be strings");
+  }
+  if (!j["max_iter"].is_number_integer()) {
+    throw std::invalid_argument("Maximum iterations must be an integer");
+  }
+  if (!j["rel_tol"].is_number() || !j["abs_tol"].is_number()) {
+    throw std::invalid_argument("Tolerance values must be numbers");
+  }
+  if (!j["output_path"].is_string()) {
+    throw std::invalid_argument("Output path must be a string");
+  }
 }
