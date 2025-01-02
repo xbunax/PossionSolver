@@ -1,0 +1,18 @@
+{
+    "lx": 1.0,
+    "ly": 1.0,
+    "Nx": 10,
+    "Ny": 20,
+    "mesh":"rectangle",
+    "guess": "exp(-x-y)",
+    "source": "exp(-u)",
+    "source_derivatives": "-exp(-u)",
+    "max_iter": 100,
+    "rel_tol": 1e-6,
+    "abs_tol": 1e-6,
+    "u_left": 1,
+    "u_right": 2,
+    "u_top": 1,
+    "u_bottom": 1,
+    "output_path": "../result/output.vtk"
+}
