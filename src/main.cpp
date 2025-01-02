@@ -38,24 +38,16 @@ int main(int argc, char *argv[]) {
       VectorXd U = newton_solve_nonlinear(
           config.Nx, config.Ny, x, y, source_func, source_deriv_func, U0,
           config.u_left, config.u_right, config.u_top, config.u_bottom,
-          config.rel_tol, config.abs_tol, config.max_iter);
+          config.rel_tol, config.abs_tol, config.max_iter, config.mesh);
+
       std::string numerical_vtk = "numerical_solution.vtk";
       std::string analytical_vtk = "analytical_solution.vtk";
       std::string error_vtk = "error.vtk";
 
       // 保存所有结果并计算误差
-      // save_solutions_and_error(numerical_vtk, analytical_vtk, error_vtk, U, x, y,
+      // save_solutions_and_error(numerical_vtk, analytical_vtk, error_vtk, U,
+      // x, y,
       //                          config.lx, config.ly);
-      MatrixXd res(n_y, n_x);
-      for (int j = 0; j < n_y; ++j) {
-        for (int i = 0; i < n_x; ++i) {
-          int node = j * n_x + i;
-          res(j, i) = U(node);
-        }
-      }
-
-      // 保存结果
-      save_to_vtk(config.output_path, res, x, y);
 
       std::cout << "Solution has been saved to: " << config.output_path
                 << std::endl;

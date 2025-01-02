@@ -5,3 +5,4 @@ build
 build/*
 lib
 lib/*
+bin/PossionSolver
