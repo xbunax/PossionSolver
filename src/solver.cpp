@@ -67,7 +67,7 @@ Matrix4d compute_stiffness(double x0, double x1, double y0, double y1,
         Vector2d gradNj = invJ * dNj;
 
         double u = Ue.dot(Vector4d(N1(s, t), N2(s, t), N3(s, t), N4(s, t)));
-        // double source_deriv = -exp(-u);
+
         double source_deriv = source_deriv_func.evaluate({u});
 
         return (gradNi.dot(gradNj) + source_deriv * N[i](s, t) * N[j](s, t)) *
@@ -172,8 +172,8 @@ double N3(double x, double y, const Vector2d &v1, const Vector2d &v2,
 }
 
 Matrix3d compute_stiffness(const Vector2d &v1, const Vector2d &v2,
-                          const Vector2d &v3, const Vector3d &Ue,
-                          FunctionParser &source_deriv_func) {
+                           const Vector2d &v3, const Vector3d &Ue,
+                           FunctionParser &source_deriv_func) {
   Matrix3d K = Matrix3d::Zero();
   double area =
       ((v2[0] - v1[0]) * (v3[1] - v1[1]) - (v3[0] - v1[0]) * (v2[1] - v1[1])) /
@@ -201,9 +201,9 @@ Matrix3d compute_stiffness(const Vector2d &v1, const Vector2d &v2,
   double xc = (v1[0] + v2[0] + v3[0]) / 3.0;
   double yc = (v1[1] + v2[1] + v3[1]) / 3.0;
   double u_center = N1(xc, yc, v1, v2, v3) * Ue[0] +
-                   N2(xc, yc, v1, v2, v3) * Ue[1] +
-                   N3(xc, yc, v1, v2, v3) * Ue[2];
-  
+                    N2(xc, yc, v1, v2, v3) * Ue[1] +
+                    N3(xc, yc, v1, v2, v3) * Ue[2];
+
   double source_deriv = source_deriv_func.evaluate({u_center});
 
   Matrix3d M;
@@ -217,8 +217,8 @@ Matrix3d compute_stiffness(const Vector2d &v1, const Vector2d &v2,
 
 // 三角形单元荷载向量计算
 Vector3d compute_force(const Vector2d &v1, const Vector2d &v2,
-                        const Vector2d &v3, const Vector3d &Ue,
-                        FunctionParser &source_func) {
+                       const Vector2d &v3, const Vector3d &Ue,
+                       FunctionParser &source_func) {
   Vector3d F = Vector3d::Zero();
   double area =
       ((v2[0] - v1[0]) * (v3[1] - v1[1]) - (v3[0] - v1[0]) * (v2[1] - v1[1])) /
@@ -228,8 +228,8 @@ Vector3d compute_force(const Vector2d &v1, const Vector2d &v2,
   double xc = (v1[0] + v2[0] + v3[0]) / 3.0;
   double yc = (v1[1] + v2[1] + v3[1]) / 3.0;
   double u_center = N1(xc, yc, v1, v2, v3) * Ue[0] +
-                   N2(xc, yc, v1, v2, v3) * Ue[1] +
-                   N3(xc, yc, v1, v2, v3) * Ue[2];
+                    N2(xc, yc, v1, v2, v3) * Ue[1] +
+                    N3(xc, yc, v1, v2, v3) * Ue[2];
 
   double source_value = source_func.evaluate({u_center});
 

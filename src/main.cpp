@@ -8,7 +8,6 @@ int main(int argc, char *argv[]) {
   }
 
   try {
-    // 读取并验证配置
     Config config = Config::from_json(argv[1]);
 
     // 创建函数解析器
@@ -23,7 +22,6 @@ int main(int argc, char *argv[]) {
       std::vector<double> x(x_vec.data(), x_vec.data() + x_vec.size());
       std::vector<double> y(y_vec.data(), y_vec.data() + y_vec.size());
 
-      // 在网格生成后添加这些调试信息
       std::cout << "Grid information:" << std::endl;
       std::cout << "x range: [" << x.front() << ", " << x.back() << "]"
                 << std::endl;
@@ -47,7 +45,6 @@ int main(int argc, char *argv[]) {
           config.u_left, config.u_right, config.u_top, config.u_bottom,
           config.rel_tol, config.abs_tol, config.max_iter, config.mesh);
 
-      // 将一维向量U重组为二维矩阵
       MatrixXd U_matrix(config.Ny + 1, config.Nx + 1);
       for (int j = 0; j < config.Ny + 1; ++j) {
         for (int i = 0; i < config.Nx + 1; ++i) {
